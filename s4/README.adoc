@@ -1,0 +1,46 @@
+= S4 Exercises
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+. Check `boto3` is already installed executing `poetry add boto3`
+. Create a bucket in your AWS account starting with `bdi-aircraft`
+. Re-implement the `/aircraft/download` and `/aircraft/prepare` endpoints inside this folder to store the raw files inside s3.
+. Download and process at least a 1000 files 
+. Deploy the application to EC2, either manually or via Terraform/terragrunt/CloudFormation code. 
+
+
+NOTE: You will be able to call the updated endpoints with the `/api/s4` prefix.
+
+TIP: Call the api like `BDI_S3_BUCKET=yourbucket poetry run uvicorn ...`
+
+=== Getting the latest code
+https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork[How to update your repository (fork) with the latest changes]
+
+NOTE: If there are merge conflicts, please let me and the teaching assistants know (via email) and we'll solve it together.
+
+== Evaluation
+
+I'll use my own bucket to test your code.
+It's important you use the `Settings().s3_bucket` variable in your code
+and place the files in the correct path
+
+Base: 8
+* Code (4 points)
+* Cleanliness and code coverage (your tests inside `tests/s4`) (2 point)
+* Screenshot of your s3 bucket directory with the 1000 raw files (1 point)
+* If you deploy it in your AWS EC2 instance (1.5 points) Add also a screenshot of the
+`/docs` page where the IP of your website appears. 
+* Setup the infrastructure as a code with Terraform (1.5 points).
+
+WARNING: Don't hardcode any AWS credentials or passwords in your code. Authenticate via the AWS cli or using environment variables. 
+
+== Links of interest
+
+* https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#s3[Boto3 s3 docs]
+* https://developer.hashicorp.com/terraform/tutorials/aws-get-started[Terraform AWS get started]
+* https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance[Terraform Resource: aws_instance]

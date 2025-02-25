@@ -1,0 +1,81 @@
+= S7 Exercises
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+. Check out the new code version
+. Adapt the endpoints inside the `bdi_api/s7` folder to read from s3 and insert into a postgreSQL RDS
+. Adapt read endpoints to obtain data from postgreSQL
+  . Use the environment variables `DB_XYZ`
+. (Optional) Write your own tests inside `tests/s7`
+
+[IMPORTANT]
+--
+I'll use those environment variables to connect to my own database to run the tests.
+
+So use them in your code via the class `bdi_api.settings.DBCredentials`.
+You'll find them already imported in the variable `db_credentials`
+
+[,python]
+----
+include::../settigns.py[lines=10..18]
+----
+
+--
+
+IMPORTANT: Ensure you create/validate everything you need is set in the database.
+This includes any table you might need to create.
+
+== Obtaining my changes
+
+[source,bash]
+----
+git remote add marti https://github.com/martsec/big-data-infrastructure-exercises.git
+git fetch marti main
+# Let's backup first!
+git checkout -b backup_branch_s7
+git checkout main
+git merge marti/main
+# Now solve the conflicts (if any) and commit
+# Conflicts will look like <<<<<<  and >>>>>> and will contain both your code and my code
+# Often IDEs like pycharm and vscode will have nice user interface to solve them
+----
+
+[NOTE]
+--
+For compatibility reasons I needed to update the open-telemetry library versions
+and fix them (`= "1.21.0"`). If you find a conflict with those, let me know.
+
+_(OPTIONAL) Longer explanation_: previously I had `= "^1.21.0"`. This `^` meant that it tried to install upgrades that were compatible (e.g. `1.22.0`) but that was causing conflicts.
+--
+
+== How to deliver the solution
+
+1. Commit and push your code to github.
+2. Go to your GitHub's commit history, take a screenshot and upload it to campus
+
+I'll use the latest commit shown in the snapshot to evaluate your code.
+
+
+== Evaluation
+
+* 4 points: set of evaluation tests
+* 2 points: your test coverage and code format
+* 1 point: Diagram of the deployed app in AWS (assume RDS and EC2)
+* 1 point: RDS database is not open to the internet (ADD SCREENSHOT of RDS configuration)
+* 1 point: Response time for `/aircraft/{icao}/stats` is ~< 20ms
+* 1 point: IaC (Terraform, terragrunt, CloudFormation) to deploy your application
+
+== Links of interest
+
+TIP: Try not to use Windows and use WSL2 instead: a linux "layer" for windows.
+https://www.youtube.com/watch?v=28Ei63qtquQ[Windows 11] https://www.youtube.com/watch?v=_fntjriRe48[windows 10]
+
+* https://www.psycopg.org/psycopg3/[Psycopg 3 driver]
+* https://www.sqlalchemy.org/[SQLAlchemy library]
+
+TIP: If using psycopg, use the binary. This will add it to your pyproject `poetry add 'psycopg[binary]'`

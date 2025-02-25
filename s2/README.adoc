@@ -1,0 +1,70 @@
+= S2 Exercises
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+1. Update the `Dockerfile` inside `docker/` to build and run the API.
+
+TIP: You can build the container executing `docker build -t bdi_api -f docker/Dockerfile .` from the project folder
+or just executing `make build_docker`
+
+Requirements:
+* It needs to have a folder called `/opt/data`
+* This folder is where we will mount the volume to store the downloaded data.
+* Application will be configured (via environment variables) to read from `/opt/data`
+
+== Extra: Docker compose
+
+If we have a bigger application with multiple parts (or _components_),
+we usually will need to deploy all of them together.
+For this, there are "expansions" to the docker ecosystem like https://docs.docker.com/compose/[`docker compose`]
+or full-fledged platforms like Kubernetes (`k8s`).
+
+To keep things simple we'll stick to `compose`, that will allow us to
+
+Update the `compose.yaml` file to
+
+== Extra 2: Observability
+
+> Observability is crucial when building an API as it allows developers and operators to gain insights into the system's performance, identify potential issues, and ensure smooth operation. With the increasing complexity of modern APIs and distributed systems, traditional monitoring tools may fall short in providing a comprehensive view. Observability, as a concept, encompasses monitoring, logging, and tracing, offering a more holistic approach to understanding system behavior. By adopting observability practices, developers can proactively detect and address issues, optimize performance, and enhance the overall reliability of their APIs.
+>
+> https://opentelemetry.io/docs/what-is-opentelemetry/[OpenTelemetry] plays a pivotal role in achieving observability by providing a standardized, vendor-agnostic set of libraries to enable consistent tracing and monitoring across diverse environments. It facilitates the generation, collection, and transmission of telemetry data, including traces and metrics. It empowers developers to gain deeper insights into the flow of requests, track latency, and pinpoint bottlenecks, leading to improved debugging, optimization, and overall system performance.
+
+We'll use [open telemetry's fastAPI library] and
+https://uptrace.dev/[Uptrace]: an open source platform
+to provide a visual interface (and database) to our observability metrics.
+
+The code and libraries are already updated to support uptrace.
+
+Task:
+* Adapt your docker compose file to deploy uptrace.
+* Update the `telemetry_dsn` parameter in settings (e.g. via environment variables) accordingly
+
+
+NOTE: You can use any other tool you might have used in the past (e.g. Datadog),
+and if you want to provide it as a solution for others, please let me know.
+
+== Solutions
+
+Since this was an in-class exercise you'll find the different solutions inside the
+`docker` folder in teh files:
+
+* `optimized.Dockerfile`
+* `simple.Dockerfile`
+* `solution.compose.yaml`
+
+
+The compose file also has a solution for the Observability task.
+
+
+=== Links of interest
+
+* https://docs.docker.com/compose/[Docker compose]
+* https://youtube.com/watch?v=HG6yIjZapSA[Docker Compose Tutorial] (video)
+* https://fastapi.tiangolo.com/deployment/docker/[FastAPI in Containers - Docker]
+* https://uptrace.dev/get/instrument/opentelemetry-fastapi.html#opentelemetry-sdk[Monitor FastAPI with OpenTelemetry]
+* https://github.com/uptrace/uptrace/tree/master/example/docker[Uptrace - Docker]

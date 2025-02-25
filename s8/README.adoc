@@ -1,0 +1,162 @@
+= S7 Exercises
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+This is the final project and comprises much of what we have been seeing those last sessions.
+This is the reason why it's worth the same as the other ones.
+
+> Goals
+>
+> * Use airflow to extract, load and transform data
+> * Update the `/api/s8/aircrafts` endpoint
+
+TIP: you may resuse and adapt the s3 and RDS code and logic
+
+. Check out the new code from my repo
+. Write your dag file to download and prepare the `readsb-hist` data for multiple days. Consider
+* Idempotency: Executing a dag twice mustn't duplicate data
+* Each dag execution downloads 100 files for its day
+* Separate steps for download and prepare
+* We just have access to the 1st day of data for each month. Don't try to download any others
+. Write a dag to download https://github.com/martsec/flight_co2_analysis/blob/main/data/aircraft_type_fuel_consumption_rates.json[aircraft_type_fuel_consumption_rates]
+. Write a dag to download the http://downloads.adsbexchange.com/downloads/basic-ac-db.json.gz[Aircraft Database].
+It's always a full refresh so consider idempotency accordingly.
+. Adapt `bdi_api/app.py` to serve the endpoints inside `bdi_api/s8/exercise.py`
+. Update the `/aircraft` endpoint
+. Update the `/aircraft/{icao}/co2` endpoint
+
+NOTE: the FastAPI and the dags are two independent environments
+
+IMPORTANT: Limit to 100 `readsb-hist` files for each day
+
+NOTE: *Extra point*: maintain all historic data from `aircrafts database` and don't overwrite every execution day. At the same time, make sure don't provide duplicated data due to this in the `/api/s8/aircrafts` endpoint
+
+NOTE: *Extra point*: Write Infrastructure as Code (terraform or cloudformation) to deploy all the aws infrastructure: S3, RDS, EC2 instance with the API, security groups and EC2 instance with airflow. Create a folder called `deploy` and add them there. Provide screenshots of all deployed services and an architecture diagram.
+
+== Installing and running airflow
+
+Airflow is a library and an app.
+On one hand the library will allow us to write the dag. On the other hand the application will pick-up our dag and process it.
+
+IMPORTANT: *Do not use windows*. Use Linux/MacOS or install WSL2 (Windows subsystem for linux 2)
+
+
+You have two options.
+
+=== 1. Install it locally
+
+This is the best way of having airflow, since it installs both the app and the
+library that your IDE will recognize.
+
+// TODO
+
+[source,bash]
+----
+AIRFLOW_VERSION=2.8.1
+PYTHON_VERSION="$(python3 --version | cut -d " " -f 2 | cut -d "." -f 1-2)"
+CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+
+pip3 install "apache-airflow[amazon,postgres]==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+
+----
+
+
+NOTE: If you are using and old version of MacOS, it will probably not work.
+
+
+=== 2. Run it via docker
+
+Limitation: you just install the app and not the library.
+Your IDE will not help in knowing if you are making some errors in the code.
+
+[source,bash]
+----
+export AIRFLOW_HOME=$HOME/airflow
+mkdir $AIRFLOW_HOME
+mkdir $AIRFLOW_HOME/dags
+chmod -R 777 $AIRFLOW_HOME
+# chmod -R o+r $HOME/.aws
+
+
+docker run -p 8080:8080 -e AIRFLOW_UID=$(id -u) -v $HOME/.aws:/home/airflow/.aws -v $AIRFLOW_HOME:/opt/airflow --name airflow -e AIRFLOW__CORE__LOAD_EXAMPLES='true' apache/airflow:latest standalone
+
+# To install any pip package (e.g. pandas, which is already installed)
+docker exec airflow pip install pandas
+----
+
+This will provide a base image with the basic packages installed like `boto3`, `psycopg2`, `pandas`
+It will also mount your aws credentials file to the docker container.
+
+In this case, put your dags inside `$AIRFLOW_HOME/dags`
+
+IMPORTANT: visit the airflow UI http://localhost:8080 and check the logs for the user and password
+
+=== Writing a dag
+
+Airflow will automatically pick up dags inside the `$AIRFLOW_HOME/dags/` folder.
+`AIRFLOW_HOME` is usually `$HOME/airflow/` If this folder does not exist, create it.
+
+You can follow the airflow documentation:
+
+* https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html[DAGs]
+* https://airflow.apache.org/docs/apache-airflow/stable/howto/operator/python.html[Create a task to execute python code]
+
+== Obtaining my changes
+
+This exercise does not change anything outside this folder, so no conflicts should arise. 
+If you have any issues, please contact me.
+
+[source,bash]
+----
+git remote add marti https://github.com/martsec/big-data-infrastructure-exercises.git
+git fetch marti main
+# Let's backup first!
+git checkout -b backup_branch_s8
+git checkout main
+git merge marti/main
+# Now solve the conflicts (if any) and commit
+# Conflicts will look like <<<<<<  and >>>>>> and will contain both your code and my code
+# Often IDEs like pycharm and vscode will have nice user interface to solve them
+----
+
+WARNING: If after the merge you have issues running your app, it's probably because conflicts were not fully resolved. Check all the updated files.
+
+
+
+== How to deliver the solution
+
+1. Commit and push your code to github.
+2. Go to your GitHub's commit history, take a screenshot and upload it to campus
+3. Screenshot of successful executions for each one of your dags.
+4. Architecture diagram
+
+I'll use the latest commit shown in the snapshot to evaluate your code.
+
+
+== Evaluation
+
+* 5 points: set of evaluation tests
+* 2 points your own tests for FastAPI endpoints (not the dags)
+* 1 point: code cleanliness with `ruff`
+* 1 point: architecture diagram of the new solution with airflow
+* 1 point: usage DataLake layers (bronze, silver, gold) and partitions
+
+
+
+TIP: If you want to test airflow (not required): link:https://airflow.apache.org/docs/apache-airflow/2.6.0/core-concepts/executor/debug.html[Testing and debugging airflow dags]
+
+== Links of interest
+
+IMPORTANT: Airflow does not support Windows. Make sure you are using WSL2
+
+* Airflow examples and definitions in the slides
+* https://www.youtube.com/watch?v=5peQThvQmQk[Learn Apache Airflow in 10 Minutes]
+* https://www.youtube.com/watch?v=K9AnJ9_ZAXE&list=PLwFJcsJ61oujAqYpMp1kdUBcPG0sE0QMT[Airflow Tutorial for Beginners - Full Course in 2 Hours 2022]
+
+
+TIP: Some of those videos also show you how to set-up airflow. If you have airflow already installed, skip those.

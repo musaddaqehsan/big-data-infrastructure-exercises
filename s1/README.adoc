@@ -1,0 +1,59 @@
+= S1 Exercises
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+1. Download and configure https://github.com/martsec/big-data-infrastructure-exercises[the app] to run on your machine
+2. Familiarize yourself with https://fastapi.tiangolo.com/[`FastAPI`] and the example endpoints and tests
+3. Download a couple of files of our https://samples.adsbexchange.com/readsb-hist/2023/11/01/[flights data] and understand it using its https://www.adsbexchange.com/version-2-api-wip/[documentation]
+4. Build the exercises found in the files from this folder
+
+
+TIP: Explore how to write clean and concise code in python. Best practices and testing your code is something that will help you understand what you wrote 6 months ago way.
+
+
+== How to deliver the solution
+
+1. Commit and push your code to github.
+2. Go to your GitHub's commit history, take a screenshot and upload it to campus
+
+I'll use the latest commit shown in the snapshot to evaluate your code.
+
+== How will the exercises be evaluated?
+
+For the parts requiring code, I'll consider the following:
+
+1. Start the application. It does not start -> 0 automatically
+2. I'll run a series of data validation tests against your application (6 points)
+ * % of passed tests
+3. Pass code linting (`ruff`, for best code practices) (1 points)
+ * 0 -> 100%
+ * 1-3 -> 80%
+ * 4-5 -> 60%
+ * 6-8 -> 50%
+ * >8 -> 0%
+4. Performance evaluation (1 point)
+ * I'll run the `/aircraft/prepare` in the same computer/server
+ * My time for processing 1000 files in a Intel Core Ultra 7 155H over mobile network is 2min
+ * I Recommend you test with a lower number of files first 
+5. Tests you might have implemented (2 points)
+ * Coverage % and completeness
+ * Having failing tests result in a 0 for this section
+
+TIP: to ensure you have added all the needed libraries in poetry, 
+clone your code in another folder and run `poetry install` and then run the tests/app. 
+
+== Links of interest
+
+TIP: Try not to use Windows and use WSL2 instead: a linux "layer" for windows.
+https://www.youtube.com/watch?v=28Ei63qtquQ[Windows 11] https://www.youtube.com/watch?v=_fntjriRe48[windows 10]
+
+* https://www.youtube.com/watch?v=hwP7WQkmECE[Git Explained in 100 Seconds]
+* https://www.youtube.com/watch?v=Qks3eqlImy8[Poetry: Professional Project & Dependency Management in Python]
+* https://www.youtube.com/watch?v=0f3moPe_bhk[ How to Create and Use Virtual Environments in Python With Poetry]
+
+WARNING: Don't assume the data is clean and pristine. You might face some surprises.
