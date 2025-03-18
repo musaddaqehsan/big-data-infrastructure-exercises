@@ -1,55 +1,245 @@
-from typing import Annotated
+import gzip
+import io
+import json
+import logging
+import os
+from datetime import datetime, timedelta
+from typing import List, Dict, Any
 
+import boto3
+import requests
 from fastapi import APIRouter, status
-from fastapi.params import Query
-
 from bdi_api.settings import Settings
 
+# Configure logging with a consistent format
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# Initialize settings from configuration
 settings = Settings()
 
+# Define FastAPI router with specific prefixes and response definitions
 s4 = APIRouter(
+    prefix="/api/s4",
+    tags=["s4"],
     responses={
         status.HTTP_404_NOT_FOUND: {"description": "Not found"},
         status.HTTP_422_UNPROCESSABLE_ENTITY: {"description": "Something is wrong with the request"},
     },
-    prefix="/api/s4",
-    tags=["s4"],
 )
 
 
-@s4.post("/aircraft/download")
-def download_data(
-    file_limit: Annotated[
-        int,
-        Query(
-            ...,
-            description="""
-    Limits the number of files to download.
-    You must always start from the first the page returns and
-    go in ascending order in order to correctly obtain the results.
-    I'll test with increasing number of files starting from 100.""",
-        ),
-    ] = 100,
-) -> str:
-    """Same as s1 but store to an aws s3 bucket taken from settings
-    and inside the path `raw/day=20231101/`
+# ---- S3 and File Handling Functions ----
 
-    NOTE: you can change that value via the environment variable `BDI_S3_BUCKET`
+def upload_to_s3(data_stream: io.BytesIO, bucket: str, key: str, s3_client=None) -> None:
     """
-    base_url = settings.source_url + "/2023/11/01/"
-    s3_bucket = settings.s3_bucket
-    s3_prefix_path = "raw/day=20231101/"
-    # TODO
+    Uploads a file-like object to AWS S3.
 
-    return "OK"
+    Args:
+        data_stream: The file-like object to upload.
+        bucket: The S3 bucket name.
+        key: The S3 key (path) for the uploaded file.
+        s3_client: Optional boto3 S3 client; creates a new one if not provided.
+    """
+    s3_client = s3_client or boto3.client("s3")
+    try:
+        s3_client.upload_fileobj(data_stream, bucket, key)
+        logger.info(f"Successfully uploaded to S3: {bucket}/{key}")
+    except Exception as e:
+        logger.error(f"Failed to upload {key} to S3: {e}")
+        raise
 
+
+def download_stream(url: str) -> io.BytesIO | None:
+    """
+    Downloads a file as a stream.
+
+    Args:
+        url: The URL of the file to download.
+
+    Returns:
+        A file-like stream of the downloaded content or None if the download fails.
+    """
+    try:
+        response = requests.get(url, stream=True, timeout=24)
+        response.raise_for_status()
+        response.raw.decode_content = True  # Handle content-encoding
+        return response.raw
+    except requests.RequestException as e:
+        logger.error(f"Error downloading file from {url}: {e}")
+        return None
+
+
+def stream_to_s3(url: str, bucket: str, key: str, s3_client=None) -> None:
+    """
+    Downloads a file from a URL and streams it directly to S3.
+
+    Args:
+        url: The URL of the file.
+        bucket: The target S3 bucket.
+        key: The S3 key for the file.
+        s3_client: Optional boto3 S3 client.
+    """
+    file_stream = download_stream(url)
+    if file_stream is None:
+        raise ValueError(f"Failed to download file from {url}")
+    upload_to_s3(file_stream, bucket, key, s3_client)
+
+
+# ---- Aircraft Data Download Endpoint ----
+
+@s4.post("/aircraft/download")
+def download_aircraft_data(file_limit: int = 1000, s3_client=None) -> str:
+    """
+    Downloads aircraft data files and uploads them to an S3 bucket.
+
+    Args:
+        file_limit: Number of files to download (default: 1000).
+        s3_client: Optional boto3 S3 client for dependency injection.
+
+    Returns:
+        A status message indicating the number of files downloaded and their S3 location.
+    """
+    base_url = f"{settings.source_url}/2023/11/01/"
+    s3_bucket = settings.s3_bucket  # Use settings.s3_bucket directly
+    s3_prefix = "raw/day=20231101/"
+    current_time = datetime.strptime("000000", "%H%M%S")
+
+    for _ in range(file_limit):
+        filename = current_time.strftime("%H%M%SZ.json.gz")
+        file_url = f"{base_url}{filename}"
+        s3_key = f"{s3_prefix}{filename}"
+
+        try:
+            stream_to_s3(file_url, s3_bucket, s3_key, s3_client)
+        except Exception as e:
+            logger.error(f"Failed to process file {file_url}: {e}")
+            continue
+
+        # Increment time by 5 seconds and handle overflow
+        current_time += timedelta(seconds=5)
+        if current_time.second >= 60:
+            current_time = current_time.replace(second=0, minute=current_time.minute + 1)
+
+    return f"Downloaded {file_limit} files and uploaded to S3 bucket: {s3_bucket}/{s3_prefix}"
+
+
+# ---- Directory and Data Processing Functions ----
+
+def clean_directory(path: str) -> None:
+    """
+    Removes all files from the specified directory.
+
+    Args:
+        path: The directory path to clean.
+    """
+    if not os.path.exists(path):
+        return
+
+    for filename in os.listdir(path):
+        file_path = os.path.join(path, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+                logger.debug(f"Deleted file: {file_path}")
+        except Exception as e:
+            logger.error(f"Error deleting {file_path}: {e}")
+
+
+def process_aircraft_data(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Processes raw aircraft JSON data into a structured format.
+
+    Args:
+        data: The raw JSON data containing aircraft information.
+
+    Returns:
+        A list of processed aircraft records.
+    """
+    timestamp = data.get("now")
+    aircraft_records = data.get("aircraft", [])
+
+    return [
+        {
+            "icao": record.get("hex"),
+            "registration": record.get("r"),
+            "type": record.get("t"),
+            "lat": record.get("lat"),
+            "lon": record.get("lon"),
+            "alt_baro": record.get("alt_baro"),
+            "timestamp": timestamp,
+            "max_altitude_baro": record.get("alt_baro"),
+            "max_ground_speed": record.get("gs"),
+            "had_emergency": record.get("alert", 0) == 1,
+        }
+        for record in aircraft_records
+    ]
+
+
+# ---- Aircraft Data Preparation Endpoint ----
 
 @s4.post("/aircraft/prepare")
-def prepare_data() -> str:
-    """Obtain the data from AWS s3 and store it in the local `prepared` directory
-    as done in s2.
-
-    All the `/api/s1/aircraft/` endpoints should work as usual
+def prepare_aircraft_data(s3_client=None) -> str:
     """
-    # TODO
-    return "OK"
+    Retrieves aircraft data from S3, processes it, and saves it locally.
+
+    Args:
+        s3_client: Optional boto3 S3 client for dependency injection.
+
+    Returns:
+        A status message indicating where the processed data was saved or an error message.
+    """
+    s3_client = s3_client or boto3.client("s3")
+    s3_bucket = settings.s3_bucket  # Use settings.s3_bucket directly
+    s3_prefix = "raw/day=20231101/"
+    local_dir = settings.prepared_dir  # Use settings.prepared_dir from Settings
+
+    # Prepare the local directory
+    clean_directory(local_dir)
+    os.makedirs(local_dir, exist_ok=True)
+
+    try:
+        # List objects in S3
+        response = s3_client.list_objects_v2(Bucket=s3_bucket, Prefix=s3_prefix)
+        if "Contents" not in response:
+            logger.info(f"No files found in S3 bucket: {s3_bucket}/{s3_prefix}")
+            return "No files found in S3."
+
+        # Process each file
+        for obj in response["Contents"]:
+            s3_key = obj["Key"]
+            filename = os.path.basename(s3_key)
+            local_file_path = os.path.join(local_dir, filename.replace(".gz", ""))
+
+            try:
+                # Download the file
+                file_obj = s3_client.get_object(Bucket=s3_bucket, Key=s3_key)
+                raw_content = file_obj["Body"].read()
+
+                # Try to decompress as gzip; if it fails, assume it's uncompressed JSON
+                try:
+                    with gzip.GzipFile(fileobj=io.BytesIO(raw_content)) as gz_file:
+                        raw_data = json.loads(gz_file.read().decode("utf-8"))
+                except gzip.BadGzipFile:
+                    # If not a valid gzip file, treat as raw JSON
+                    raw_data = json.loads(raw_content.decode("utf-8"))
+
+                # Process and save the data
+                processed_data = process_aircraft_data(raw_data)
+                with open(local_file_path, "w", encoding="utf-8") as output_file:
+                    json.dump(processed_data, output_file)
+
+                logger.info(f"Processed and saved: {local_file_path}")
+
+            except Exception as e:
+                logger.error(f"Error processing file {s3_key}: {e}")
+                continue
+
+        return f"Prepared data saved to {local_dir}"
+
+    except Exception as e:
+        logger.error(f"Error accessing S3: {e}")
+        return f"Error accessing S3: {str(e)}"

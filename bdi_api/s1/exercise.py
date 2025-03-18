@@ -241,7 +241,7 @@ def get_aircraft_stats(icao: str) -> dict:
     emergency_status = False
     data_found = False
 
-    # Looping to fins the specified flight
+    # Looping  fins the specified flight
     for file in os.listdir(prepared_data_directory):
         file_path = os.path.join(prepared_data_directory, file)
         

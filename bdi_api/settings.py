@@ -1,5 +1,6 @@
 from os.path import dirname, join
-
+import os
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,16 +8,24 @@ import bdi_api
 
 PROJECT_DIR = dirname(dirname(bdi_api.__file__))
 
+# Load environment variables from .env at the top
+load_dotenv()
 
 class DBCredentials(BaseSettings):
-    """Use env variables prefixed with BDI_DB_"""
-
     host: str
     port: int = 5432
+    database: str
     username: str
     password: str
-    model_config = SettingsConfigDict(env_prefix="bdi_db_")
 
+    model_config = SettingsConfigDict(
+        env_prefix="bdi_db_",  # Matches your .env file
+        env_file=".env",       # Explicitly load from .env
+        env_file_encoding="utf-8",
+        extra="ignore"         # Ignore extra env vars not in this model
+    )
+
+db_credentials = DBCredentials()
 
 class Settings(BaseSettings):
     source_url: str = Field(
@@ -32,11 +41,15 @@ class Settings(BaseSettings):
         description="Call the api like `BDI_S3_BUCKET=yourbucket poetry run uvicorn...`",
     )
 
-
     telemetry: bool = False
     telemetry_dsn: str = "http://project2_secret_token@uptrace:14317/2"
 
-    model_config = SettingsConfigDict(env_prefix="bdi_")
+    model_config = SettingsConfigDict(
+        env_prefix="bdi_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"  # Ignore extra env vars like bdi_db_*
+    )
 
     @property
     def raw_dir(self) -> str:
