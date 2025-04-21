@@ -37,3 +37,8 @@ archive.zip
 
 .report.json
 .pytest.json.env
+<<<<<<< HEAD
+=======
+*.pem
+test.txt
+>>>>>>> fbd7445 (Updated exercises for S8, airflowdags, app.py, tests for S8)
